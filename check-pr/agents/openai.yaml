@@ -1,0 +1,4 @@
+interface:
+  display_name: "Check PR"
+  short_description: "Check a PR for unresolved comments, failing checks, and incomplete description"
+  default_prompt: "Use $check-pr to analyze this PR and fix any actionable issues."

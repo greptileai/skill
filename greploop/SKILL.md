@@ -43,6 +43,13 @@ Push the latest changes (if any):
 git push
 ```
 
+Before requesting a fresh review, snapshot the latest Greptile issue comment timestamp:
+
+```bash
+gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments \
+  --jq '[.[] | select(.user.login | test("greptile-apps")) | .updated_at] | last'
+```
+
 Then request a fresh Greptile review by posting a PR comment (Greptile watches for this trigger):
 
 ```bash
@@ -57,15 +64,16 @@ gh pr checks <PR_NUMBER> --watch
 
 #### B. Fetch Greptile review results
 
-Get the latest review from Greptile:
+Greptile updates an issue comment in place. Fetch the latest Greptile issue comment:
 
 ```bash
-gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews
+gh api repos/{owner}/{repo}/issues/<PR_NUMBER>/comments \
+  --jq '[.[] | select(.user.login | test("greptile-apps")) | {updated_at, body}] | last'
 ```
 
-Look for the most recent review from `greptile-apps[bot]` or `greptile-apps-staging[bot]`.
+Confirm the `updated_at` timestamp is newer than the snapshot from step A before trusting the body. If it is not newer yet, poll again briefly.
 
-Parse the review body for:
+Parse the latest comment body for:
 - **Confidence score**: Greptile includes a score like `3/5` or `5/5` in its review summary.
 - **Comment count**: Number of inline review comments.
 
@@ -80,7 +88,7 @@ Filter to comments from Greptile that are on the latest commit.
 #### C. Check exit conditions
 
 Stop the loop if **any** of these are true:
-- Confidence score is **5/5**  AND there are **zero unresolved comments**
+- Confidence score is **5/5**  AND the latest Greptile comment shows **zero unresolved comments**
 - Max iterations reached (report current state)
 
 #### D. Fix actionable comments
