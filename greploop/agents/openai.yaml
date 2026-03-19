@@ -1,0 +1,4 @@
+interface:
+  display_name: "Greploop"
+  short_description: "Loop on Greptile PR feedback to completion"
+  default_prompt: "Use $greploop to iterate on this PR until Greptile reaches 5/5."
