@@ -6,7 +6,7 @@ description: >
   re-triggers review, and repeats. Use when the user wants to fully optimize a PR against
   Greptile's code review standards.
 license: MIT
-compatibility: Requires bash, git, gh (GitHub CLI) authenticated, and Greptile installed on the repo.
+compatibility: Requires git, gh (GitHub CLI) authenticated, and Greptile installed on the repo.
 metadata:
   author: greptileai
   version: "1.0"
@@ -66,7 +66,6 @@ fi
 Then poll for the Greptile check to complete:
 
 ```bash
-#!/bin/bash
 HEAD_SHA=$(gh pr view <PR_NUMBER> --json headRefOid -q .headRefOid)
 
 # Poll for Greptile check run to complete (check runs, not action runs)
