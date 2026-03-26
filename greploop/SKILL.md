@@ -43,16 +43,57 @@ Push the latest changes (if any):
 git push
 ```
 
-Then request a fresh Greptile review by posting a PR comment (Greptile watches for this trigger):
+Wait for checks to start after push:
 
 ```bash
-gh pr comment <PR_NUMBER> --body "@greptile review"
+sleep 5
+```
+
+Check if Greptile is already running on this PR before posting a new trigger comment:
+
+```bash
+GREPTILE_STATE=$(gh pr checks <PR_NUMBER> --json name,state | jq -r '.[] | select(.name | test("greptile"; "i")) | .state')
+```
+
+If Greptile is **not** already running (`PENDING` or `IN_PROGRESS`), request a fresh review by posting a PR comment (Greptile watches for this trigger):
+
+```bash
+if [ "$GREPTILE_STATE" != "PENDING" ] && [ "$GREPTILE_STATE" != "IN_PROGRESS" ]; then
+  gh pr comment <PR_NUMBER> --body "@greptile review"
+fi
 ```
 
 Then poll for the Greptile check to complete:
 
 ```bash
-gh pr checks <PR_NUMBER> --watch
+HEAD_SHA=$(gh pr view <PR_NUMBER> --json headRefOid -q .headRefOid)
+
+# Poll for Greptile check run to complete (check runs, not action runs)
+while true; do
+  GREPTILE_CHECK=$(gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs" \
+    --jq '.check_runs[] | select(.name | test("greptile"; "i"))' 2>/dev/null)
+  
+  if [ -z "$GREPTILE_CHECK" ]; then
+    echo "Waiting for Greptile check to appear..."
+    sleep 5
+    continue
+  fi
+  
+  STATUS=$(echo "$GREPTILE_CHECK" | jq -r '.status // "completed"')
+  CONCLUSION=$(echo "$GREPTILE_CHECK" | jq -r '.conclusion // "pending"')
+  
+  if [ "$STATUS" = "completed" ]; then
+    if [ "$CONCLUSION" = "success" ]; then
+      echo "Greptile check passed!"
+    else
+      echo "Greptile check completed with: $CONCLUSION"
+    fi
+    break
+  fi
+  
+  echo "Waiting for Greptile... (status: $STATUS)"
+  sleep 10
+done
 ```
 
 #### B. Fetch Greptile review results
@@ -88,7 +129,8 @@ Filter to comments from Greptile that are on the latest commit.
 #### C. Check exit conditions
 
 Stop the loop if **any** of these are true:
-- Confidence score is **5/5**  AND there are **zero unresolved comments**
+
+- Confidence score is **5/5** AND there are **zero unresolved comments**
 - Max iterations reached (report current state)
 
 #### D. Fix actionable comments
@@ -142,17 +184,23 @@ git commit -m "address greptile review feedback (greploop iteration N)"
 git push
 ```
 
+Wait for checks to start after push:
+
+```bash
+sleep 5
+```
+
 Then go back to step **A**.
 
 ### 3. Report
 
 After exiting the loop, summarize:
 
-| Field | Value |
-|-------|-------|
-| Iterations | N |
-| Final confidence | X/5 |
-| Comments resolved | N |
+| Field              | Value      |
+| ------------------ | ---------- |
+| Iterations         | N          |
+| Final confidence   | X/5        |
+| Comments resolved  | N          |
 | Remaining comments | N (if any) |
 
 If the loop exited due to max iterations, list any remaining unresolved comments and suggest next steps.
