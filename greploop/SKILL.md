@@ -60,7 +60,10 @@ fi
 Then poll for the Greptile check to complete:
 
 ```bash
-gh pr checks <PR_NUMBER> --watch
+HEAD_SHA=$(gh pr view <PR_NUMBER> --json headRefOid -q .headRefOid)
+GREPTILE_RUN_ID=$(gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs" \
+  --jq '.check_runs[] | select(.name | test("greptile"; "i")) | .id')
+gh run watch $GREPTILE_RUN_ID
 ```
 
 #### B. Fetch Greptile review results
@@ -74,6 +77,7 @@ gh api repos/{owner}/{repo}/pulls/<PR_NUMBER>/reviews
 Look for the most recent review from `greptile-apps[bot]` or `greptile-apps-staging[bot]`.
 
 Parse the review body for:
+
 - **Confidence score**: Greptile includes a score like `3/5` or `5/5` in its review summary.
 - **Comment count**: Number of inline review comments.
 
@@ -88,7 +92,8 @@ Filter to comments from Greptile that are on the latest commit.
 #### C. Check exit conditions
 
 Stop the loop if **any** of these are true:
-- Confidence score is **5/5**  AND there are **zero unresolved comments**
+
+- Confidence score is **5/5** AND there are **zero unresolved comments**
 - Max iterations reached (report current state)
 
 #### D. Fix actionable comments
@@ -148,11 +153,11 @@ Then go back to step **A**.
 
 After exiting the loop, summarize:
 
-| Field | Value |
-|-------|-------|
-| Iterations | N |
-| Final confidence | X/5 |
-| Comments resolved | N |
+| Field              | Value      |
+| ------------------ | ---------- |
+| Iterations         | N          |
+| Final confidence   | X/5        |
+| Comments resolved  | N          |
 | Remaining comments | N (if any) |
 
 If the loop exited due to max iterations, list any remaining unresolved comments and suggest next steps.
