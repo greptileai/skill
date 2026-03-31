@@ -67,15 +67,20 @@ Then poll for the Greptile check to complete:
 
 ```bash
 for i in $(seq 1 30); do
-  CHECKS=$(gh pr checks <PR_NUMBER> --json name,state 2>/dev/null)
-  STATE=$(echo "$CHECKS" | jq -r '.[] | select(.name | test("greptile"; "i")) | .state' 2>/dev/null)
+  STATE=$(gh pr checks <PR_NUMBER> --json name,state --jq '.[] | select(.name | test("greptile"; "i")) | .state | ascii_upcase' 2>/dev/null)
+
   if [ "$STATE" = "SUCCESS" ]; then
     echo "Greptile passed!"
     break
+  elif [ "$STATE" = "FAILURE" ] || [ "$STATE" = "ERROR" ]; then
+    echo "Greptile failed ($STATE)"
+    exit 1
   fi
-  echo "Waiting for Greptile... ($STATE) attempt $i"
+
+  echo "Waiting for Greptile... (Current state: ${STATE:-PENDING}) attempt $i"
   sleep 30
 done
+
 ```
 
 #### B. Fetch Greptile review results
