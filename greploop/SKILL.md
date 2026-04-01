@@ -66,34 +66,21 @@ fi
 Then poll for the Greptile check to complete:
 
 ```bash
-HEAD_SHA=$(gh pr view <PR_NUMBER> --json headRefOid -q .headRefOid)
+for i in $(seq 1 30); do
+  STATE=$(gh pr checks <PR_NUMBER> --json name,state --jq '.[] | select(.name | test("greptile"; "i")) | .state | ascii_upcase' 2>/dev/null)
 
-# Poll for Greptile check run to complete (check runs, not action runs)
-while true; do
-  GREPTILE_CHECK=$(gh api "repos/{owner}/{repo}/commits/$HEAD_SHA/check-runs" \
-    --jq '.check_runs[] | select(.name | test("greptile"; "i"))' 2>/dev/null)
-  
-  if [ -z "$GREPTILE_CHECK" ]; then
-    echo "Waiting for Greptile check to appear..."
-    sleep 5
-    continue
-  fi
-  
-  STATUS=$(echo "$GREPTILE_CHECK" | jq -r '.status // "completed"')
-  CONCLUSION=$(echo "$GREPTILE_CHECK" | jq -r '.conclusion // "pending"')
-  
-  if [ "$STATUS" = "completed" ]; then
-    if [ "$CONCLUSION" = "success" ]; then
-      echo "Greptile check passed!"
-    else
-      echo "Greptile check completed with: $CONCLUSION"
-    fi
+  if [ "$STATE" = "SUCCESS" ]; then
+    echo "Greptile passed!"
     break
+  elif [ "$STATE" = "FAILURE" ] || [ "$STATE" = "ERROR" ]; then
+    echo "Greptile failed ($STATE)"
+    exit 1
   fi
-  
-  echo "Waiting for Greptile... (status: $STATUS)"
-  sleep 10
+
+  echo "Waiting for Greptile... (Current state: ${STATE:-PENDING}) attempt $i"
+  sleep 30
 done
+
 ```
 
 #### B. Fetch Greptile review results
